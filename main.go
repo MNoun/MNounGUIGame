@@ -8,7 +8,9 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	ebiten "github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	inpututil "github.com/hajimehoshi/ebiten/v2/inpututil"
 	"image/png"
 	"log"
@@ -17,6 +19,7 @@ import (
 
 //go:embed assets/*
 var EmbeddedAssets embed.FS
+var score = 0
 
 const (
 	GameWidth   = 1000
@@ -49,13 +52,21 @@ func (g Game) Draw(screen *ebiten.Image) {
 	g.drawOps.GeoM.Reset()
 	g.drawOps.GeoM.Translate(float64(g.player.xloc), float64(g.player.yloc))
 	screen.DrawImage(g.player.pict, &g.drawOps)
-	for i := 0; i <= 10; i++ {
-		if !g.collided {
+	for num, enemy := range g.enemies {
+		if isColliding(g.player, enemy) == true {
+			removeEnemy(g.enemies, num)
+			score += 1
+		} else {
 			g.drawOps.GeoM.Reset()
-			g.drawOps.GeoM.Translate(float64(g.enemies[i].xloc), float64(g.enemies[i].yloc))
-			screen.DrawImage(g.enemies[i].pict, &g.drawOps)
+			g.drawOps.GeoM.Translate(float64(enemy.xloc), float64(enemy.yloc))
+			screen.DrawImage(enemy.pict, &g.drawOps)
 		}
 	}
+	if score == 10 {
+
+	}
+	message := fmt.Sprintf("Score:%d", score)
+	ebitenutil.DebugPrint(screen, message)
 }
 
 func (g Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
@@ -140,16 +151,18 @@ func processPlayerInput(theGame *Game) {
 	}
 }
 
-/*
 func isColliding(player, enemy Sprite) bool {
 	enemyWidth, enemyHeight := enemy.pict.Size()
 	playerWidth, playerHeight := player.pict.Size()
-	if player.xLoc < enemy.xLoc+enemyWidth &&
-		player.xLoc+playerWidth > enemy.xLoc &&
-		player.yLoc < gold.yLoc+enemyHeight &&
-		player.yLoc+playerHeight > enemy.yLoc {
+	if player.xloc < enemy.xloc+enemyWidth &&
+		player.xloc+playerWidth > enemy.xloc &&
+		player.yloc < enemy.yloc+enemyHeight &&
+		player.yloc+playerHeight > enemy.yloc {
 		return true
 	}
 	return false
 }
-*/
+
+func removeEnemy(s []Sprite, index int) []Sprite {
+	return append(s[:index], s[index+1:]...)
+}
