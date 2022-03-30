@@ -9,17 +9,28 @@ package main
 import (
 	"embed"
 	"fmt"
+	_ "github.com/blizzy78/ebitenui"
+	"github.com/blizzy78/ebitenui/image"
+	_ "github.com/blizzy78/ebitenui/image"
+	"github.com/blizzy78/ebitenui/widget"
+	_ "github.com/blizzy78/ebitenui/widget"
 	ebiten "github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	inpututil "github.com/hajimehoshi/ebiten/v2/inpututil"
+	"golang.org/x/image/font/basicfont"
+	Image "image"
+	"image/color"
 	"image/png"
 	"log"
 	"math/rand"
+	"os"
 )
 
 //go:embed assets/*
 var EmbeddedAssets embed.FS
 var score = 0
+var playbutton *widget.Button
+var quitbutton *widget.Button
 
 const (
 	GameWidth   = 1000
@@ -63,7 +74,44 @@ func (g Game) Draw(screen *ebiten.Image) {
 		}
 	}
 	if score == 10 {
-
+		playbutton.SetLocation(Image.Rectangle{
+			Min: Image.Point{
+				X: 0,
+				Y: 0},
+			Max: Image.Point{
+				X: 400,
+				Y: 500,
+			},
+		})
+		playbutton.Text().Label = "Play Again"
+		playbutton.Text().SetLocation(Image.Rectangle{
+			Min: Image.Point{
+				X: 0,
+				Y: 0},
+			Max: Image.Point{
+				X: 400,
+				Y: 500,
+			},
+		})
+		quitbutton.SetLocation(Image.Rectangle{
+			Min: Image.Point{
+				X: 0,
+				Y: 0},
+			Max: Image.Point{
+				X: 600,
+				Y: 500,
+			},
+		})
+		quitbutton.Text().Label = "Quit"
+		quitbutton.Text().SetLocation(Image.Rectangle{
+			Min: Image.Point{
+				X: 0,
+				Y: 0},
+			Max: Image.Point{
+				X: 600,
+				Y: 500,
+			},
+		})
 	}
 	message := fmt.Sprintf("Score:%d", score)
 	ebitenutil.DebugPrint(screen, message)
@@ -86,19 +134,51 @@ func main() {
 	}
 	game.enemies = []Sprite{}
 	width, height := (*ebiten.Image).Size(loadPNGImageFromEmbedded("EnemySprite.png"))
-	for i := 0; i <= 10; i++ {
-		s := Sprite{
-			pict: loadPNGImageFromEmbedded("EnemySprite.png"),
-			xloc: rand.Intn(GameWidth - width),
-			yloc: rand.Intn(GameHeight - height),
-			dX:   0,
-			dY:   0,
-		}
-		game.enemies = append(game.enemies, s)
-	}
+	game.enemies = populateEnemy(game, width, height)
+
 	if err := ebiten.RunGame(&game); err != nil {
 		log.Fatal("Oh no! something terrible happened and the game crashed", err)
 	}
+	idle, err := loadImageNineSlice("graphics/button-idle.png", 20, 0)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	hover, err := loadImageNineSlice("graphics/button-hover.png", 20, 0)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	pressed, err := loadImageNineSlice("graphics/button-pressed.png", 20, 0)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	disabled, err := loadImageNineSlice("graphics/button-disabled.png", 20, 0)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	buttonImage := &widget.ButtonImage{
+		Idle:     idle,
+		Hover:    hover,
+		Pressed:  pressed,
+		Disabled: disabled,
+	}
+	quitbutton = widget.NewButton(
+		widget.ButtonOpts.Image(buttonImage),
+		widget.ButtonOpts.Text("Quit", basicfont.Face7x13, &widget.ButtonTextColor{
+			Idle: color.RGBA{0xdf, 0xf4, 0xff, 0xff},
+		}),
+		widget.ButtonOpts.TextPadding(widget.Insets{
+			Left:  30,
+			Right: 30,
+		}),
+		widget.ButtonOpts.ClickedHandler(quit),
+	)
+	playbutton = widget.NewButton(
+		widget.ButtonOpts.Image(buttonImage),
+		widget.ButtonOpts.Text("Play Again", basicfont.Face7x13, &widget.ButtonTextColor{
+			Idle: color.RGBA{0xdf, 0xf4, 0xff, 0xff},
+		}),
+		widget.ButtonOpts.ClickedHandler(playAgain),
+	)
 }
 
 func loadPNGImageFromEmbedded(name string) *ebiten.Image {
@@ -163,6 +243,41 @@ func isColliding(player, enemy Sprite) bool {
 	return false
 }
 
+func populateEnemy(g Game, width, height int) []Sprite {
+	for i := 0; i <= 10; i++ {
+		s := Sprite{
+			pict: loadPNGImageFromEmbedded("EnemySprite.png"),
+			xloc: rand.Intn(GameWidth - width),
+			yloc: rand.Intn(GameHeight - height),
+			dX:   0,
+			dY:   0,
+		}
+		g.enemies = append(g.enemies, s)
+	}
+	return g.enemies
+}
+
 func removeEnemy(s []Sprite, index int) []Sprite {
 	return append(s[:index], s[index+1:]...)
+}
+
+func loadImageNineSlice(path string, centerWidth int, centerHeight int) (*image.NineSlice, error) {
+	i := loadPNGImageFromEmbedded(path)
+
+	w, h := i.Size()
+	return image.NewNineSlice(i,
+			[3]int{(w - centerWidth) / 2, centerWidth, w - (w-centerWidth)/2 - centerWidth},
+			[3]int{(h - centerHeight) / 2, centerHeight, h - (h-centerHeight)/2 - centerHeight}),
+		nil
+}
+
+func playAgain(args *widget.ButtonClickedEventArgs) {
+	score = 0
+	g := Game{}
+	width, height := (*ebiten.Image).Size(loadPNGImageFromEmbedded("EnemySprite.png"))
+	g.enemies = populateEnemy(g, width, height)
+}
+
+func quit(args *widget.ButtonClickedEventArgs) {
+	os.Exit(1)
 }
