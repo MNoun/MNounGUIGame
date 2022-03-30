@@ -12,6 +12,7 @@ import (
 	inpututil "github.com/hajimehoshi/ebiten/v2/inpututil"
 	"image/png"
 	"log"
+	"math/rand"
 )
 
 //go:embed assets/*
@@ -32,10 +33,11 @@ type Sprite struct {
 }
 
 type Game struct {
-	player Sprite
-	//enemies []Sprite
-	score   int
-	drawOps ebiten.DrawImageOptions
+	player   Sprite
+	enemies  []Sprite
+	score    int
+	drawOps  ebiten.DrawImageOptions
+	collided bool
 }
 
 func (g *Game) Update() error {
@@ -47,6 +49,13 @@ func (g Game) Draw(screen *ebiten.Image) {
 	g.drawOps.GeoM.Reset()
 	g.drawOps.GeoM.Translate(float64(g.player.xloc), float64(g.player.yloc))
 	screen.DrawImage(g.player.pict, &g.drawOps)
+	for i := 0; i <= 10; i++ {
+		if !g.collided {
+			g.drawOps.GeoM.Reset()
+			g.drawOps.GeoM.Translate(float64(g.enemies[i].xloc), float64(g.enemies[i].yloc))
+			screen.DrawImage(g.enemies[i].pict, &g.drawOps)
+		}
+	}
 }
 
 func (g Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
@@ -56,15 +65,27 @@ func (g Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight
 func main() {
 	ebiten.SetWindowSize(GameWidth, GameHeight)
 	ebiten.SetWindowTitle("Project 3: Ebiten Game")
-	simpleGame := Game{score: 0}
-	simpleGame.player = Sprite{
+	game := Game{score: 0}
+	game.player = Sprite{
 		pict: loadPNGImageFromEmbedded("PlayerSprite.png"),
 		xloc: 200,
 		yloc: 300,
 		dX:   0,
 		dY:   0,
 	}
-	if err := ebiten.RunGame(&simpleGame); err != nil {
+	game.enemies = []Sprite{}
+	width, height := (*ebiten.Image).Size(loadPNGImageFromEmbedded("EnemySprite.png"))
+	for i := 0; i <= 10; i++ {
+		s := Sprite{
+			pict: loadPNGImageFromEmbedded("EnemySprite.png"),
+			xloc: rand.Intn(GameWidth - width),
+			yloc: rand.Intn(GameHeight - height),
+			dX:   0,
+			dY:   0,
+		}
+		game.enemies = append(game.enemies, s)
+	}
+	if err := ebiten.RunGame(&game); err != nil {
 		log.Fatal("Oh no! something terrible happened and the game crashed", err)
 	}
 }
@@ -118,3 +139,17 @@ func processPlayerInput(theGame *Game) {
 		theGame.player.xloc = GameWidth - theGame.player.pict.Bounds().Size().X
 	}
 }
+
+/*
+func isColliding(player, enemy Sprite) bool {
+	enemyWidth, enemyHeight := enemy.pict.Size()
+	playerWidth, playerHeight := player.pict.Size()
+	if player.xLoc < enemy.xLoc+enemyWidth &&
+		player.xLoc+playerWidth > enemy.xLoc &&
+		player.yLoc < gold.yLoc+enemyHeight &&
+		player.yLoc+playerHeight > enemy.yLoc {
+		return true
+	}
+	return false
+}
+*/
